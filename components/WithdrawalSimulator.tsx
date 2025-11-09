@@ -87,23 +87,27 @@ const WithdrawalSimulator: React.FC<WithdrawalSimulatorProps> = ({ onBack }) => 
       <div>
         <h2 className="text-xs font-semibold text-center mb-3 text-slate-300 tracking-[0.2em] uppercase">Resultados por Perfil</h2>
         <div className="space-y-3">
-          {Object.entries(results).map(([key, value]) => (
-            <div key={key} className="bg-zinc-800/50 p-4 rounded-lg border border-zinc-700/50 text-left">
-              <h4 className="font-semibold text-lg text-amber-500 mb-2">{RISK_PROFILES[key as keyof typeof RISK_PROFILES].label}</h4>
-              <div className="grid grid-cols-2 gap-4 text-center">
-                  <div>
-                    <p className="text-xs text-slate-400 tracking-wider">Banca Necessária</p>
-                    <div className="overflow-x-auto no-scrollbar">
-                      <p className="font-semibold text-2xl text-white tracking-wider whitespace-nowrap px-1">{formatCurrency(value.bankroll)}</p>
+          {/* FIX: Refactored to use Object.keys for type-safe iteration, as Object.entries was inferring an `unknown` type for the value. */}
+          {(Object.keys(results) as Array<keyof typeof results>).map((key) => {
+            const value = results[key];
+            return (
+              <div key={key} className="bg-zinc-800/50 p-4 rounded-lg border border-zinc-700/50 text-left">
+                <h4 className="font-semibold text-lg text-amber-500 mb-2">{RISK_PROFILES[key].label}</h4>
+                <div className="grid grid-cols-2 gap-4 text-center">
+                    <div>
+                      <p className="text-xs text-slate-400 tracking-wider">Banca Necessária</p>
+                      <div className="overflow-x-auto no-scrollbar">
+                        <p className="font-semibold text-2xl text-white tracking-wider whitespace-nowrap px-1">{formatCurrency(value.bankroll)}</p>
+                      </div>
                     </div>
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-400 tracking-wider">Nº de Operações</p>
-                    <p className="font-semibold text-2xl text-white tracking-wider">{value.trades > 0 ? value.trades : '-'}</p>
-                  </div>
+                    <div>
+                      <p className="text-xs text-slate-400 tracking-wider">Nº de Operações</p>
+                      <p className="font-semibold text-2xl text-white tracking-wider">{value.trades > 0 ? value.trades : '-'}</p>
+                    </div>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
