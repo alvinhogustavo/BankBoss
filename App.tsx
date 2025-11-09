@@ -14,7 +14,6 @@ type Screen = 'splash' | 'welcome' | 'mode_selection' | 'start' | 'dashboard' | 
 
 const App: React.FC = () => {
   const [screen, setScreen] = useState<Screen>('splash');
-  const [initialBankroll, setInitialBankroll] = useState<number>(0);
   const [currentBankroll, setCurrentBankroll] = useState<number>(0);
   const [dailyPlan, setDailyPlan] = useState<DailyPlan | null>(null);
   const [dailyProfitLoss, setDailyProfitLoss] = useState<number>(0);
@@ -70,10 +69,9 @@ const App: React.FC = () => {
     setScreen('start');
   };
 
-  const handleStartSession = (bankroll: number, payout: number) => {
+  const handleStartSession = (bankroll: number) => {
     if (!riskProfile) return;
 
-    const payoutRate = payout / 100;
     const riskPerTrade = RISK_PROFILES[riskProfile].value;
     const safeWithdrawalPercent = SAFE_WITHDRAWAL_PERCENTAGES[riskProfile].value;
 
@@ -86,7 +84,6 @@ const App: React.FC = () => {
       stopLoss: entryValue * 2,
     };
 
-    setInitialBankroll(bankroll);
     setCurrentBankroll(bankroll);
     setDailyPlan(plan);
     setDailyProfitLoss(0);
@@ -97,12 +94,10 @@ const App: React.FC = () => {
 
   const handleTradeResult = (result: 'win' | 'loss', payout: number) => {
     if (!dailyPlan) return;
-    
-    const payoutRate = payout / 100;
 
     let tradeResultValue = 0;
     if (result === 'win') {
-      tradeResultValue = dailyPlan.entryValue * payoutRate;
+      tradeResultValue = dailyPlan.entryValue * (payout / 100);
     } else {
       tradeResultValue = -dailyPlan.entryValue;
     }

@@ -4,7 +4,7 @@ import { RISK_PROFILES, SAFE_WITHDRAWAL_PERCENTAGES } from '../constants';
 
 interface StartScreenProps {
   riskProfile: RiskProfile;
-  onStart: (bankroll: number, payout: number) => void;
+  onStart: (bankroll: number) => void;
   onNavigateToSimulator: () => void;
   onNavigateToGrowth: () => void;
   onBack: () => void;
@@ -93,7 +93,7 @@ const StartScreen: React.FC<StartScreenProps> = ({ riskProfile, onStart, onNavig
       return;
     }
     setError('');
-    onStart(bankrollValue, payoutValue);
+    onStart(bankrollValue);
   };
 
   return (
