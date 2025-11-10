@@ -1,18 +1,17 @@
-// FIX: Provide a valid Firebase configuration and initialize services.
-// This resolves the "is not a module" errors in other files.
+// Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
-// IMPORTANT: Replace the placeholder values below with your actual Firebase project configuration.
-// You can find this in your Firebase project settings.
+// Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
-  authDomain: "your-project-id.firebaseapp.com",
-  projectId: "your-project-id",
-  storageBucket: "your-project-id.appspot.com",
-  messagingSenderId: "123456789012",
-  appId: "1:123456789012:web:1234567890abcdef123456"
+  apiKey: "AIzaSyCnUgRqdBBqHE5rQNaFwmre-O9djTAmPWg",
+  authDomain: "bankboss-85bff.firebaseapp.com",
+  projectId: "bankboss-85bff",
+  storageBucket: "bankboss-85bff.firebasestorage.app",
+  messagingSenderId: "590981711345",
+  appId: "1:590981711345:web:e55234e9b12393c4c1f050",
+  measurementId: "G-F7T4MQB08T"
 };
 
 // Initialize Firebase
