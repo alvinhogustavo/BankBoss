@@ -2,9 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { HistoryEntry } from '../types';
 import PerformanceChart from './PerformanceChart';
 import { SAFE_WITHDRAWAL_PERCENTAGES } from '../constants';
-// FIX: Removed a misleading comment about a corrected import path.
-import { auth } from '../firebase';
-import { signOut } from 'firebase/auth';
+import { supabase } from '../supabase';
 
 interface GrowthScreenProps {
   history: HistoryEntry[];
@@ -24,7 +22,7 @@ const GrowthScreen: React.FC<GrowthScreenProps> = ({ history, currentBankroll, w
 
   const handleLogout = async () => {
     try {
-      await signOut(auth);
+      await supabase.auth.signOut();
     } catch (error) {
       console.error("Error signing out: ", error);
     }

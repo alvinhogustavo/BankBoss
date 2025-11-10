@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { User, onAuthStateChanged, getRedirectResult } from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
-import { auth, db } from './firebase';
+import { Session, User } from '@supabase/supabase-js';
+import { supabase } from './supabase';
 
 import { DailyPlan, HistoryEntry, RiskProfile } from './types';
 import { MOTIVATIONAL_QUOTES, PAYOUT_RATE, RISK_PROFILES } from './constants';
 
 import SplashScreen from './components/SplashScreen';
+// FIX: The LoginScreen component is now correctly implemented and exported, fixing the 'is not a module' error.
 import LoginScreen from './components/LoginScreen';
 import ModeSelectionScreen from './components/ModeSelectionScreen';
 import StartScreen from './components/StartScreen';
@@ -21,7 +21,8 @@ type Screen = 'splash' | 'welcome' | 'login' | 'modeSelection' | 'start' | 'dash
 const App: React.FC = () => {
   // Authentication & Loading
   const [isLoading, setIsLoading] = useState(true);
-  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const user = session?.user;
 
   // App State
   const [screen, setScreen] = useState<Screen>('splash');
@@ -43,100 +44,82 @@ const App: React.FC = () => {
 
   const saveSessionData = useCallback(async () => {
     if (!user) return;
-    const userRef = doc(db, "users", user.uid);
     const newHistoryEntry: HistoryEntry = { date: new Date().toISOString(), bankroll: currentBankroll };
-    
     const updatedHistory = [...history, newHistoryEntry];
 
-    await setDoc(userRef, {
+    const { error } = await supabase.from('profiles').upsert({ 
+        id: user.id,
+        updated_at: new Date().toISOString(),
         history: updatedHistory,
-        lockoutUntil: lockoutUntil,
+        lockout_until: lockoutUntil ? new Date(lockoutUntil).toISOString() : null,
         bankroll: currentBankroll,
-        email: user.email,
-        withdrawalGoal: withdrawalGoal,
-    }, { merge: true });
+        withdrawal_goal: withdrawalGoal
+    });
 
-    setHistory(updatedHistory);
+    if (error) {
+        console.error("Error saving session data:", error);
+    } else {
+        setHistory(updatedHistory);
+    }
   }, [user, currentBankroll, lockoutUntil, history, withdrawalGoal]);
 
   const saveWithdrawalGoal = useCallback(async (goal: number) => {
     if (!user) return;
     setWithdrawalGoal(goal);
-    const userRef = doc(db, "users", user.uid);
-    await updateDoc(userRef, { withdrawalGoal: goal });
+    const { error } = await supabase.from('profiles').update({ withdrawal_goal: goal }).eq('id', user.id);
+    if (error) console.error("Error saving withdrawal goal:", error);
   }, [user]);
 
   useEffect(() => {
-    const loadUserData = async (firebaseUser: User) => {
-      const userRef = doc(db, "users", firebaseUser.uid);
-      try {
-        const docSnap = await getDoc(userRef);
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          const lastBankroll = data.history?.length > 0 ? data.history[data.history.length - 1].bankroll : data.bankroll || 0;
-          setCurrentBankroll(lastBankroll);
-          setHistory(data.history || []);
-          setLockoutUntil(data.lockoutUntil || null);
-          setWithdrawalGoal(data.withdrawalGoal || 0);
-          return true; // Indicate that user data exists
-        } else {
-          await setDoc(userRef, { 
-            email: firebaseUser.email,
-            bankroll: 0,
-            history: [],
-            lockoutUntil: null,
-            withdrawalGoal: 0
-          });
-          return false; // Indicate new user
-        }
-      } catch (error) {
-        console.error("Error loading user data from Firestore:", error);
-        // If we can't load data, we can't proceed. Log out and show login screen.
-        setUser(null);
+    const loadUserData = async (supabaseUser: User) => {
+      const { data, error } = await supabase.from('profiles').select('*').eq('id', supabaseUser.id).single();
+      
+      if (error && error.code !== 'PGRST116') { // PGRST116 = row not found
+        console.error("Error loading user data from Supabase:", error);
+        await supabase.auth.signOut();
         setScreen('login');
         setIsLoading(false);
-        return null; // Indicate error
-      }
-    };
-    
-    const handleAuth = async () => {
-      try {
-        // This processes the redirect result from Google Login
-        const result = await getRedirectResult(auth);
-        // If result is not null, a user has just signed in via redirect.
-        // The onAuthStateChanged listener below will handle the user state update.
-        if (result) {
-            console.log("Redirect result processed for user:", result.user.displayName);
-        }
-      } catch (error) {
-        console.error("Error processing redirect result:", error);
+        return null;
       }
       
-      const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-        if (firebaseUser) {
-          const isExistingUser = await loadUserData(firebaseUser);
-          setUser(firebaseUser);
-          if (isExistingUser === false) { // A brand new user
-            setScreen('welcome');
-          } else if (isExistingUser === true) { // An existing user
-            setScreen('modeSelection');
-          }
-          // if isExistingUser is null, an error occurred and the screen was already set.
-        } else {
-          setUser(null);
-          setScreen('login'); // If no user, go to login
-        }
-        setIsLoading(false);
-      });
-      return unsubscribe;
+      if (data) {
+        const lastBankroll = data.history?.length > 0 ? data.history[data.history.length - 1].bankroll : data.bankroll || 0;
+        setCurrentBankroll(lastBankroll);
+        setHistory(data.history || []);
+        setLockoutUntil(data.lockout_until ? new Date(data.lockout_until).getTime() : null);
+        setWithdrawalGoal(data.withdrawal_goal || 0);
+        return true; // Indicate that user data exists
+      } else {
+        // This is a new user, their profile will be created on the first save.
+        return false;
+      }
     };
     
-    const unsubscribePromise = handleAuth();
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+        setSession(session);
+        if (session) {
+            const isExistingUser = await loadUserData(session.user);
+            setScreen(isExistingUser ? 'modeSelection' : 'welcome');
+        } else {
+            setScreen('login');
+        }
+        setIsLoading(false);
+    });
 
-    return () => {
-        unsubscribePromise.then(unsubscribe => unsubscribe && unsubscribe());
-    };
-}, []);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+        setSession(session);
+        setIsLoading(true);
+        if (session) {
+            const isExistingUser = await loadUserData(session.user);
+            setScreen(isExistingUser ? 'modeSelection' : 'welcome');
+        } else {
+            setScreen('login');
+        }
+        setIsLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
 
   const handleSelectProfile = (profile: RiskProfile) => {
