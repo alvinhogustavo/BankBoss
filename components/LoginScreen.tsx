@@ -2,9 +2,7 @@ import React, { useState } from 'react';
 import { auth } from '../firebase';
 import { 
   createUserWithEmailAndPassword, 
-  signInWithEmailAndPassword,
-  GoogleAuthProvider,
-  signInWithPopup
+  signInWithEmailAndPassword
 } from 'firebase/auth';
 
 const LoginScreen: React.FC = () => {

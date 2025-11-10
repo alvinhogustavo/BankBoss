@@ -1,14 +1,14 @@
-// Fix: Add a triple-slash directive to include Vite's client types to resolve issues with `import.meta.env`.
-/// <reference types="vite/client" />
-
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
 // This robust configuration works in both development and production (Vercel).
 // It safely checks for environment variables and uses them if they exist (for Vercel),
-// but falls back to the hardcoded keys for the local development environment without crashing.
-const env = (typeof import.meta !== 'undefined' && import.meta.env) ? import.meta.env : {};
+// but falls back to the hardcoded keys for the local development environment.
+// The `as any` cast is necessary to bypass TypeScript errors in environments
+// where `import.meta.env` is not fully typed during the build check.
+// FIX: Use type assertion on `import.meta` to avoid TypeScript errors when Vite client types are not loaded.
+const env = (typeof import.meta !== 'undefined' && (import.meta as any).env ? (import.meta as any).env : {}) as any;
 
 const firebaseConfig = {
   apiKey: env.VITE_FIREBASE_API_KEY || "AIzaSyCnUgRqdBBqHE5rQNaFwmre-O9djTAmPWg",
