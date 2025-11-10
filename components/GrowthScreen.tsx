@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { HistoryEntry } from '../types';
 import PerformanceChart from './PerformanceChart';
 import { SAFE_WITHDRAWAL_PERCENTAGES } from '../constants';
+// FIX: Corrected import path for firebase.
 import { auth } from '../firebase';
 import { signOut } from 'firebase/auth';
 

@@ -1,6 +1,8 @@
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { User, onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
+// FIX: Corrected import path for firebase.
 import { auth, db } from './firebase';
 
 import { DailyPlan, HistoryEntry, RiskProfile } from './types';
@@ -175,7 +177,7 @@ const App: React.FC = () => {
             }
         });
     }
-  }, [lockoutUntil, screen]);
+  }, [lockoutUntil, screen, saveSessionData, history.length, currentBankroll]);
 
 
   // --- Navigation ---

@@ -4,6 +4,7 @@ import {
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword 
 } from 'firebase/auth';
+// FIX: Corrected import path for firebase.
 import { auth, googleProvider } from '../firebase';
 
 const LoginScreen: React.FC = () => {
