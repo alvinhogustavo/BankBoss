@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { HistoryEntry } from '../types';
 import PerformanceChart from './PerformanceChart';
