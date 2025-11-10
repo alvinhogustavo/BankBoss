@@ -64,7 +64,8 @@ const StartScreen: React.FC<StartScreenProps> = ({ riskProfile, onStart, onNavig
         if (distance < 0) {
           clearInterval(timerInterval);
           setTimeLeft("");
-          window.location.reload(); 
+          // FIX: Removed window.location.reload() as it is bad practice in a single-page-application.
+          // The component will re-render due to state change and correctly reflect the unlocked state.
           return;
         }
 

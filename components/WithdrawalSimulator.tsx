@@ -87,7 +87,7 @@ const WithdrawalSimulator: React.FC<WithdrawalSimulatorProps> = ({ onBack }) => 
       <div>
         <h2 className="text-xs font-semibold text-center mb-3 text-slate-300 tracking-[0.2em] uppercase">Resultados por Perfil</h2>
         <div className="space-y-3">
-          {/* FIX: Refactored to use Object.keys for type-safe iteration, as Object.entries was inferring an `unknown` type for the value. */}
+          {/* FIX: Removed an obsolete comment for code cleanup. */}
           {(Object.keys(results) as Array<keyof typeof results>).map((key) => {
             const value = results[key];
             return (
