@@ -28,7 +28,8 @@ const LoginScreen: React.FC = () => {
         await createUserWithEmailAndPassword(auth, email, password);
       }
     } catch (err: any) {
-      if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
+      console.error("Firebase Auth Error:", err); // Improved debugging
+      if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
         setError('Email ou senha inválidos.');
       } else if (err.code === 'auth/email-already-in-use') {
         setError('Este email já está em uso.');
@@ -37,7 +38,6 @@ const LoginScreen: React.FC = () => {
       } else {
         setError('Ocorreu um erro. Tente novamente.');
       }
-      console.error(err);
     } finally {
       setIsLoading(false);
     }
