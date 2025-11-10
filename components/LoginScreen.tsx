@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
 import { 
-  signInWithPopup, 
+  signInWithRedirect, 
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword 
 } from 'firebase/auth';
-// FIX: Corrected import path for firebase.
 import { auth, googleProvider } from '../firebase';
 
 const LoginScreen: React.FC = () => {
@@ -19,10 +18,10 @@ const LoginScreen: React.FC = () => {
     setLoading(true);
     setError('');
     try {
-      await signInWithPopup(auth, googleProvider);
+      await signInWithRedirect(auth, googleProvider);
     } catch (error: any) {
       console.error("Erro na autenticação com Google:", error);
-      setError('Não foi possível entrar com o Google. Tente novamente.');
+      setError(`Não foi possível entrar com o Google. Erro: ${error.code}`);
     } finally {
       setLoading(false);
     }
