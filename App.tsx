@@ -1,4 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { auth, db } from './firebase';
+import { onAuthStateChanged, User } from 'firebase/auth';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+
 import StartScreen from './components/StartScreen';
 import DashboardScreen from './components/DashboardScreen';
 import EndScreen from './components/EndScreen';
@@ -7,13 +11,17 @@ import WelcomeScreen from './components/WelcomeScreen';
 import GrowthScreen from './components/GrowthScreen';
 import WithdrawalSimulator from './components/WithdrawalSimulator';
 import ModeSelectionScreen from './components/ModeSelectionScreen';
+import LoginScreen from './components/LoginScreen';
 import { DailyPlan, HistoryEntry, RiskProfile } from './types';
 import { MOTIVATIONAL_QUOTES, RISK_PROFILES, SAFE_WITHDRAWAL_PERCENTAGES } from './constants';
 
-type Screen = 'splash' | 'welcome' | 'mode_selection' | 'start' | 'dashboard' | 'end_win' | 'end_loss' | 'growth' | 'simulator';
+type Screen = 'splash' | 'login' | 'welcome' | 'mode_selection' | 'start' | 'dashboard' | 'end_win' | 'end_loss' | 'growth' | 'simulator';
 
 const App: React.FC = () => {
   const [screen, setScreen] = useState<Screen>('splash');
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  
   const [currentBankroll, setCurrentBankroll] = useState<number>(0);
   const [dailyPlan, setDailyPlan] = useState<DailyPlan | null>(null);
   const [dailyProfitLoss, setDailyProfitLoss] = useState<number>(0);
@@ -21,96 +29,103 @@ const App: React.FC = () => {
   const [withdrawalGoal, setWithdrawalGoal] = useState<number>(0);
   const [lockoutTimestamp, setLockoutTimestamp] = useState<number | null>(null);
   const [riskProfile, setRiskProfile] = useState<RiskProfile | null>(null);
-
+  const [sessionPayout, setSessionPayout] = useState<number>(87);
+  
+  // Effect for handling auth state and loading initial data from Firestore
   useEffect(() => {
-    // This effect runs only ONCE on mount to initialize the app state.
-    const savedHistory = localStorage.getItem('tradingHistory');
-    const history = savedHistory ? JSON.parse(savedHistory) : [];
-    if (history.length > 0) {
-      setTradingHistory(history);
-    }
-  
-    const savedGoal = localStorage.getItem('withdrawalGoal');
-    if (savedGoal) {
-      setWithdrawalGoal(parseFloat(savedGoal));
-    }
-  
-    const lockoutUntil = localStorage.getItem('lockoutUntil');
-    const lockoutTime = lockoutUntil ? parseInt(lockoutUntil, 10) : null;
-  
-    if (lockoutTime && Date.now() < lockoutTime) {
-      // If locked out, go directly to the growth/locked screen
-      setLockoutTimestamp(lockoutTime);
-      if (history.length > 0) {
-        setCurrentBankroll(history[history.length - 1].bankroll);
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      if (currentUser) {
+        setUser(currentUser);
+        // User is signed in, load their data
+        const userDocRef = doc(db, 'users', currentUser.uid);
+        const docSnap = await getDoc(userDocRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setTradingHistory(data.tradingHistory || []);
+          setWithdrawalGoal(data.withdrawalGoal || 0);
+          setLockoutTimestamp(data.lockoutTimestamp || null);
+
+          if (data.lockoutTimestamp && Date.now() < data.lockoutTimestamp) {
+            const lastBankroll = data.tradingHistory?.length > 0 ? data.tradingHistory[data.tradingHistory.length - 1].bankroll : 0;
+            setCurrentBankroll(lastBankroll);
+            setScreen('growth');
+          } else {
+             setScreen('welcome');
+          }
+        } else {
+          // New user, doc doesn't exist yet.
+          setScreen('welcome');
+        }
+      } else {
+        // User is signed out
+        setUser(null);
+        setScreen('login');
       }
-      setScreen('growth');
-    } else {
-      // If not locked out, start with the splash screen and then move on to the welcome screen
-      const timer = setTimeout(() => {
-        setScreen('welcome');
-      }, 3000); // 3-second splash screen
-      
-      // Cleanup function to clear the timer if the component unmounts
-      return () => clearTimeout(timer);
-    }
+      setIsLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
+  
+  const saveDataToFirestore = async (dataToSave: object) => {
+    if (!user) return;
+    const userDocRef = doc(db, 'users', user.uid);
+    try {
+      await setDoc(userDocRef, dataToSave, { merge: true });
+    } catch (error) {
+      console.error("Error saving data to Firestore:", error);
+    }
+  };
 
   const motivationalQuote = useMemo(() => {
     return MOTIVATIONAL_QUOTES[Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length)];
   }, []);
 
-  const handleStartWelcome = () => {
-    setScreen('mode_selection');
-  };
-
+  const handleStartWelcome = () => setScreen('mode_selection');
   const handleSelectProfile = (profile: RiskProfile) => {
     setRiskProfile(profile);
     setScreen('start');
   };
 
-  const handleStartSession = (bankroll: number) => {
+  const handleStartSession = (bankroll: number, payout: number) => {
     if (!riskProfile) return;
 
     const riskPerTrade = RISK_PROFILES[riskProfile].value;
     const safeWithdrawalPercent = SAFE_WITHDRAWAL_PERCENTAGES[riskProfile].value;
 
-    const safeDailyGoal = bankroll * safeWithdrawalPercent;
-    const entryValue = bankroll * riskPerTrade;
+    const entryValue = parseFloat((bankroll * riskPerTrade).toFixed(2));
+    const safeDailyGoal = parseFloat((bankroll * safeWithdrawalPercent).toFixed(2));
+    const stopLossValue = parseFloat((entryValue * 2).toFixed(2));
     
-    const plan: DailyPlan = {
-      entryValue,
-      stopWin: safeDailyGoal,
-      stopLoss: entryValue * 2,
-    };
+    const plan: DailyPlan = { entryValue, stopWin: safeDailyGoal, stopLoss: stopLossValue };
 
     setCurrentBankroll(bankroll);
     setDailyPlan(plan);
     setDailyProfitLoss(0);
+    setSessionPayout(payout);
     setWithdrawalGoal(safeDailyGoal);
-    localStorage.setItem('withdrawalGoal', safeDailyGoal.toString());
+    saveDataToFirestore({ withdrawalGoal: safeDailyGoal });
     setScreen('dashboard');
   };
 
-  const handleTradeResult = (result: 'win' | 'loss', payout: number) => {
+  const handleTradeResult = (result: 'win' | 'loss') => {
     if (!dailyPlan) return;
 
     let tradeResultValue = 0;
     if (result === 'win') {
-      tradeResultValue = dailyPlan.entryValue * (payout / 100);
+      tradeResultValue = parseFloat((dailyPlan.entryValue * (sessionPayout / 100)).toFixed(2));
     } else {
       tradeResultValue = -dailyPlan.entryValue;
     }
 
-    const newProfitLoss = dailyProfitLoss + tradeResultValue;
-    setCurrentBankroll(currentBankroll + tradeResultValue);
+    const newProfitLoss = parseFloat((dailyProfitLoss + tradeResultValue).toFixed(2));
+    const newBankroll = parseFloat((currentBankroll + tradeResultValue).toFixed(2));
+
+    setCurrentBankroll(newBankroll);
     setDailyProfitLoss(newProfitLoss);
 
-    if (newProfitLoss >= dailyPlan.stopWin) {
-      setScreen('end_win');
-    } else if (newProfitLoss <= -dailyPlan.stopLoss) {
-      setScreen('end_loss');
-    }
+    if (newProfitLoss >= dailyPlan.stopWin) setScreen('end_win');
+    else if (newProfitLoss <= -dailyPlan.stopLoss) setScreen('end_loss');
   };
 
   const handleEndSession = () => {
@@ -118,18 +133,27 @@ const App: React.FC = () => {
     const newHistoryEntry: HistoryEntry = { date: today, bankroll: currentBankroll };
     const updatedHistory = [...tradingHistory.filter(h => h.date !== today), newHistoryEntry];
     setTradingHistory(updatedHistory);
-    localStorage.setItem('tradingHistory', JSON.stringify(updatedHistory));
 
     const tomorrow = new Date();
     tomorrow.setHours(24, 0, 0, 0);
     const tomorrowTime = tomorrow.getTime();
-    localStorage.setItem('lockoutUntil', tomorrowTime.toString());
     setLockoutTimestamp(tomorrowTime);
+    
+    saveDataToFirestore({ 
+      tradingHistory: updatedHistory,
+      lockoutTimestamp: tomorrowTime 
+    });
     
     setDailyPlan(null);
     setScreen('growth');
   };
   
+  const handleSetWithdrawalGoal = (goal: number) => {
+    const newGoal = Math.max(0, goal);
+    setWithdrawalGoal(newGoal);
+    saveDataToFirestore({ withdrawalGoal: newGoal });
+  };
+
   const handleNavigateToGrowth = () => {
     if (tradingHistory.length > 0) {
       setCurrentBankroll(tradingHistory[tradingHistory.length - 1].bankroll);
@@ -145,16 +169,24 @@ const App: React.FC = () => {
   const hasHistory = tradingHistory.length > 0;
 
   const renderScreen = () => {
+    if (isLoading || screen === 'splash') {
+      return <SplashScreen />;
+    }
+
+    if (!user) {
+      return <LoginScreen />;
+    }
+
     switch (screen) {
-      case 'splash':
-        return <SplashScreen />;
+      case 'login':
+        return <LoginScreen />;
       case 'welcome':
         return <WelcomeScreen onStart={handleStartWelcome} />;
       case 'mode_selection':
         return <ModeSelectionScreen onSelectProfile={handleSelectProfile} />;
       case 'start':
         if (riskProfile) {
-          const lastBankroll = tradingHistory.length > 0 ? tradingHistory[tradingHistory.length - 1].bankroll : 0;
+          const lastBankroll = hasHistory ? tradingHistory[tradingHistory.length - 1].bankroll : 0;
           return <StartScreen 
                     riskProfile={riskProfile}
                     onStart={handleStartSession} 
@@ -174,7 +206,7 @@ const App: React.FC = () => {
               plan={dailyPlan}
               currentBankroll={currentBankroll}
               dailyProfitLoss={dailyProfitLoss}
-              onTrade={(result) => handleTradeResult(result, 87)} // Assuming 87% payout for now
+              onTrade={handleTradeResult}
               motivationalQuote={motivationalQuote}
             />
           );
@@ -190,6 +222,7 @@ const App: React.FC = () => {
                   currentBankroll={currentBankroll} 
                   withdrawalGoal={withdrawalGoal}
                   onBackToStart={() => setScreen('mode_selection')}
+                  onSetWithdrawalGoal={handleSetWithdrawalGoal}
                 />;
       case 'simulator':
         return <WithdrawalSimulator onBack={() => setScreen('start')} />;
@@ -199,9 +232,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div 
-      className="min-h-screen flex items-center justify-center p-4 transition-all duration-500"
-    >
+    <div className="min-h-screen flex items-center justify-center p-4 transition-all duration-500">
       <div className="w-full max-w-md mx-auto">
         {renderScreen()}
       </div>
