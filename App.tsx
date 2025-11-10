@@ -50,10 +50,11 @@ const App: React.FC = () => {
             setCurrentBankroll(lastBankroll);
             setScreen('growth');
           } else {
-             setScreen('welcome');
+             // Returning user, send them directly to mode selection
+             setScreen('mode_selection');
           }
         } else {
-          // New user, doc doesn't exist yet.
+          // New user, doc doesn't exist yet. Show welcome screen once.
           setScreen('welcome');
         }
       } else {
